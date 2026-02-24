@@ -9,25 +9,35 @@ export interface UserProfile {
 }
 
 export const authService = {
-    async sendOtp(email: string) {
-        const { error } = await supabase.auth.signInWithOtp({
+    async signIn(email: string, password: string) {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        if (data.user) await authService.upsertUserProfile(data.user);
+        return data;
+    },
+
+    async signUp(email: string, password: string) {
+        const { data, error } = await supabase.auth.signUp({
             email,
-            options: { shouldCreateUser: true },
+            password,
+            options: { emailRedirectTo: undefined },
         });
+        if (error) throw error;
+        if (data.user) await authService.upsertUserProfile(data.user);
+        return data;
+    },
+
+    // Legacy OTP (kept for compatibility)
+    async sendOtp(email: string) {
+        const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
         if (error) throw error;
         return true;
     },
 
     async verifyOtp(email: string, token: string) {
-        const { data, error } = await supabase.auth.verifyOtp({
-            email,
-            token,
-            type: 'email',
-        });
+        const { data, error } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
         if (error) throw error;
-        if (data.user) {
-            await authService.upsertUserProfile(data.user);
-        }
+        if (data.user) await authService.upsertUserProfile(data.user);
         return data;
     },
 

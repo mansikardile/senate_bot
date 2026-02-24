@@ -1,30 +1,41 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, ArrowRight, Shield, Loader2, CheckCircle, Zap } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Shield, Loader2, CheckCircle, Zap, Eye, EyeOff, UserPlus } from 'lucide-react';
 import { authService } from '../services/authService';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [showPass, setShowPass] = useState(false);
+    const [isSignUp, setIsSignUp] = useState(false);
     const [loading, setLoading] = useState(false);
     const [demoLoading, setDemoLoading] = useState(false);
     const navigate = useNavigate();
     const { enterDemoMode } = useAuth();
 
-    const handleSendOtp = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!email.trim()) { toast.error('Please enter your email'); return; }
+        if (!email.trim() || !password.trim()) { toast.error('Please fill in all fields'); return; }
+        if (password.length < 6) { toast.error('Password must be at least 6 characters'); return; }
         setLoading(true);
         try {
-            await authService.sendOtp(email.trim());
-            toast.success('OTP sent to your email!', { duration: 4000 });
-            navigate('/verify-otp', { state: { email } });
+            if (isSignUp) {
+                await authService.signUp(email.trim(), password);
+                toast.success('Account created! You are now logged in.', { icon: '🎉', duration: 4000 });
+            } else {
+                await authService.signIn(email.trim(), password);
+                toast.success('Welcome back!', { icon: '👋' });
+            }
+            navigate('/chat');
         } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : 'Failed to send OTP.';
-            // If rate limit hit, suggest demo mode
-            if (msg.toLowerCase().includes('rate') || msg.toLowerCase().includes('limit')) {
-                toast.error('Email rate limit hit — use Demo Login below!', { duration: 5000 });
+            const msg = err instanceof Error ? err.message : 'Authentication failed.';
+            if (msg.includes('Invalid login') || msg.includes('invalid_credentials')) {
+                toast.error('Incorrect email or password. Try Demo Login below!');
+            } else if (msg.includes('already registered') || msg.includes('already been registered')) {
+                toast.error('Email already registered — sign in instead.', { duration: 4000 });
+                setIsSignUp(false);
             } else {
                 toast.error(msg);
             }
@@ -33,7 +44,6 @@ export default function LoginPage() {
         }
     };
 
-    // Demo login: bypasses Supabase entirely using local demo session
     const handleDemoLogin = () => {
         setDemoLoading(true);
         enterDemoMode();
@@ -99,24 +109,33 @@ export default function LoginPage() {
             {/* Login card */}
             <div className="animate-slide-up" style={{ width: '100%', maxWidth: '28rem', padding: '0 1rem', position: 'relative', zIndex: 10 }}>
                 <div className="glass-card" style={{ padding: '2rem', boxShadow: '0 32px 64px rgba(0,0,0,0.5)' }}>
-                    <div style={{ marginBottom: '1.5rem' }}>
-                        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'white', margin: '0 0 0.25rem' }}>
-                            Sign In with OTP
-                        </h2>
-                        <p style={{ color: 'rgba(255,255,255,0.40)', fontSize: '0.875rem', margin: 0 }}>
-                            Enter your email to receive a one-time password
-                        </p>
+
+                    {/* Tab toggle */}
+                    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', background: 'rgba(255,255,255,0.04)', borderRadius: '0.75rem', padding: '0.25rem' }}>
+                        {(['Sign In', 'Sign Up'] as const).map((tab, i) => (
+                            <button key={tab} onClick={() => setIsSignUp(i === 1)}
+                                style={{
+                                    flex: 1, padding: '0.5rem', borderRadius: '0.5rem', border: 'none', cursor: 'pointer',
+                                    fontWeight: 600, fontSize: '0.875rem', transition: 'all 0.2s',
+                                    background: isSignUp === (i === 1) ? 'rgba(59,130,246,0.20)' : 'transparent',
+                                    color: isSignUp === (i === 1) ? '#60A5FA' : 'rgba(255,255,255,0.40)',
+                                    borderBottom: isSignUp === (i === 1) ? '2px solid #3B82F6' : '2px solid transparent',
+                                }}>
+                                {tab}
+                            </button>
+                        ))}
                     </div>
 
-                    <form onSubmit={handleSendOtp} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+                        {/* Email */}
                         <div style={{ position: 'relative' }}>
                             <Mail size={16} color="rgba(255,255,255,0.30)"
-                                style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)' }} />
+                                style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
                             <input
                                 type="email"
                                 value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                placeholder="Enter your email address"
+                                onChange={e => setEmail(e.target.value)}
+                                placeholder="Email address"
                                 className="input-field"
                                 style={{ paddingLeft: '2.75rem' }}
                                 autoComplete="email"
@@ -124,11 +143,34 @@ export default function LoginPage() {
                             />
                         </div>
 
+                        {/* Password */}
+                        <div style={{ position: 'relative' }}>
+                            <Lock size={16} color="rgba(255,255,255,0.30)"
+                                style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                            <input
+                                type={showPass ? 'text' : 'password'}
+                                value={password}
+                                onChange={e => setPassword(e.target.value)}
+                                placeholder="Password (min 6 characters)"
+                                className="input-field"
+                                style={{ paddingLeft: '2.75rem', paddingRight: '3rem' }}
+                                autoComplete={isSignUp ? 'new-password' : 'current-password'}
+                                required
+                                minLength={6}
+                            />
+                            <button type="button" onClick={() => setShowPass(!showPass)}
+                                style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.30)', padding: 0 }}>
+                                {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                            </button>
+                        </div>
+
                         <button type="submit" disabled={loading} className="btn-primary"
                             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', width: '100%' }}>
                             {loading
-                                ? <><Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> Sending OTP...</>
-                                : <><span>Send OTP</span><ArrowRight size={18} /></>}
+                                ? <><Loader2 size={18} className="animate-spin" /> {isSignUp ? 'Creating account...' : 'Signing in...'}</>
+                                : isSignUp
+                                    ? <><UserPlus size={18} /> Create Account</>
+                                    : <><span>Sign In</span><ArrowRight size={18} /></>}
                         </button>
                     </form>
 
@@ -139,7 +181,7 @@ export default function LoginPage() {
                         <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
                     </div>
 
-                    {/* Demo Login Button */}
+                    {/* Demo Login */}
                     <button
                         onClick={handleDemoLogin}
                         disabled={demoLoading}
@@ -156,18 +198,18 @@ export default function LoginPage() {
                         onMouseLeave={e => (e.currentTarget.style.background = 'linear-gradient(135deg, rgba(245,158,11,0.15), rgba(245,158,11,0.08))')}
                     >
                         {demoLoading
-                            ? <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Starting Demo...</>
-                            : <><Zap size={16} /> Demo Login (No OTP required)</>}
+                            ? <><Loader2 size={16} className="animate-spin" /> Starting Demo...</>
+                            : <><Zap size={16} /> Demo Login — No Password Needed</>}
                     </button>
                     <p style={{ color: 'rgba(255,255,255,0.22)', fontSize: '0.7rem', textAlign: 'center', margin: '0.5rem 0 0' }}>
-                        For hackathon demo & testing purposes
+                        Instant access with pre-loaded sample data
                     </p>
 
                     {/* Security badges */}
                     <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                             {[
-                                'Secure Email OTP Authentication',
+                                'No OTP required — email & password login',
                                 'End-to-end encrypted session',
                                 'Powered by Supabase & Gemini AI',
                             ].map((item, i) => (
