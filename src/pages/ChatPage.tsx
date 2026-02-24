@@ -230,7 +230,7 @@ export default function ChatPage() {
     const [chatHistory, setChatHistory] = useState<Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }>>([]);
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
     const [isDemoRunning, setIsDemoRunning] = useState(false);
-    const [ttsEnabled, setTtsEnabled] = useState(true);
+    const [ttsEnabled, setTtsEnabled] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
