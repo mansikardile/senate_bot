@@ -28,7 +28,7 @@ export default function LoginPage() {
                 await authService.signIn(email.trim(), password);
                 toast.success('Welcome back!', { icon: '👋' });
             }
-            navigate('/chat');
+            navigate('/profile');
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : 'Authentication failed.';
             if (msg.includes('Invalid login') || msg.includes('invalid_credentials')) {
@@ -48,7 +48,7 @@ export default function LoginPage() {
         setDemoLoading(true);
         enterDemoMode();
         toast.success('Demo session started! Welcome to Senate Bot.', { icon: '🚀', duration: 3000 });
-        navigate('/chat');
+        navigate('/profile');
     };
 
     return (

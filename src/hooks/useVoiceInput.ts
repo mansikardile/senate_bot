@@ -153,8 +153,19 @@ interface TTSOptions {
 }
 
 export function useTTS({ lang = 'en-IN', enabled = false }: TTSOptions = {}) {
+    // Use a ref so the speak callback always reads the *current* enabled value,
+    // not a stale closure captured at render time.
+    const enabledRef = useRef(enabled);
+    useEffect(() => {
+        enabledRef.current = enabled;
+        // Cancel any ongoing speech immediately when user turns TTS off
+        if (!enabled && typeof window !== 'undefined') {
+            window.speechSynthesis?.cancel();
+        }
+    }, [enabled]);
+
     const speak = useCallback((text: string) => {
-        if (!enabled || typeof window === 'undefined' || !window.speechSynthesis) return;
+        if (!enabledRef.current || typeof window === 'undefined' || !window.speechSynthesis) return;
         window.speechSynthesis.cancel();
         const cleaned = text
             .replace(/\*\*(.*?)\*\*/g, '$1')
@@ -165,7 +176,7 @@ export function useTTS({ lang = 'en-IN', enabled = false }: TTSOptions = {}) {
         utterance.rate = 0.95;
         utterance.pitch = 1.0;
         window.speechSynthesis.speak(utterance);
-    }, [lang, enabled]);
+    }, [lang]); // no longer depends on `enabled` — reads via ref instead
 
     const stop = useCallback(() => {
         if (typeof window !== 'undefined') window.speechSynthesis?.cancel();
@@ -173,6 +184,7 @@ export function useTTS({ lang = 'en-IN', enabled = false }: TTSOptions = {}) {
 
     return { speak, stop };
 }
+
 
 // ─── mapLanguage helper ──────────────────────────────────────────────────────
 export function mapLanguageToVoice(appLang: string): VoiceLang {
