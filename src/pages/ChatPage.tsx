@@ -610,6 +610,18 @@ export default function ChatPage() {
                         const schemeName = response.scheme_name || text;
                         setIsGeneratingPdf(true);
                         addBotMessage(`${botText}\n\n⏳ Generating detailed PDF report for **${schemeName}**...`);
+                        // Wait for speech synthesis to finish before proceeding
+                        const waitForSpeechEnd = () => new Promise<void>((resolve) => {
+                            const check = () => {
+                                if (!window.speechSynthesis || !window.speechSynthesis.speaking) {
+                                    resolve();
+                                } else {
+                                    setTimeout(check, 200);
+                                }
+                            };
+                            check();
+                        });
+                        await waitForSpeechEnd();
                         try {
                             const citizenEmail = user?.email || 'citizen@example.com';
                             const citizenName = citizenEmail.split('@')[0] || 'Citizen';
