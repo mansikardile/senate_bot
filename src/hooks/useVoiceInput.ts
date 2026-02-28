@@ -167,16 +167,26 @@ export function useTTS({ lang = 'en-IN', enabled = false }: TTSOptions = {}) {
     const speak = useCallback((text: string) => {
         if (!enabledRef.current || typeof window === 'undefined' || !window.speechSynthesis) return;
         window.speechSynthesis.cancel();
+
         const cleaned = text
             .replace(/\*\*(.*?)\*\*/g, '$1')
             .replace(/[•✅❌⚠️🚨📋🔍👶📌🎬💼🏛️]/g, '')
             .slice(0, 300);
+
         const utterance = new SpeechSynthesisUtterance(cleaned);
         utterance.lang = lang;
         utterance.rate = 0.95;
         utterance.pitch = 1.0;
+
+        // Attempt to find a voice matching the language
+        const voices = window.speechSynthesis.getVoices();
+        const selectedVoice = voices.find(voice => voice.lang === lang);
+        if (selectedVoice) {
+            utterance.voice = selectedVoice;
+        }
+
         window.speechSynthesis.speak(utterance);
-    }, [lang]); // no longer depends on `enabled` — reads via ref instead
+    }, [lang]);
 
     const stop = useCallback(() => {
         if (typeof window !== 'undefined') window.speechSynthesis?.cancel();
